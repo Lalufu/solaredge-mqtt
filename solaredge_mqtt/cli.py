@@ -45,8 +45,16 @@ def load_config_file(filename: str) -> Dict[str, Any]:
     if ini.has_option("general", "solaredge-host"):
         config["solaredge_host"] = ini.get("general", "solaredge-host")
 
-    if ini.has_option("general", "solaredge-port"):
-        config["solaredge_port"] = ini.get("general", "solaredge-port")
+    try:
+        if ini.has_option("general", "solaredge-port"):
+            config["solaredge_port"] = ini.getint("general", "solaredge-port")
+    except ValueError:
+        LOGGER.error(
+            "%s: %s is not a valid value for solaredge-port",
+            filename,
+            ini.get("general", "solaredge-port"),
+        )
+        raise SystemExit(1)
 
     if ini.has_option("general", "mqtt-host"):
         config["mqtt_host"] = ini.get("general", "mqtt-host")
@@ -102,8 +110,8 @@ def solaredge_mqtt() -> None:
         "--solaredge-port",
         type=int,
         default=None,
-        help="Solaredge port to connect to"
-        + ("(Default: %(solaredge_port)s" % DEFAULTS),
+        help="Solaredge port to connect to. "
+        + ("(Default: %(solaredge_port)s)" % DEFAULTS),
     )
     parser.add_argument("--mqtt-host", type=str, help="MQTT server to connect to")
     parser.add_argument(
