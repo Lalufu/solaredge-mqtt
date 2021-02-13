@@ -10,6 +10,7 @@ import time
 from typing import Any, Dict
 
 import solaredge_modbus  # type: ignore
+from pymodbus.exceptions import ConnectionException  # type: ignore
 
 LOGGER = logging.getLogger(__name__)
 
@@ -52,7 +53,14 @@ def solaredge_main(mqtt_queue: multiprocessing.Queue, config: Dict[str, Any]) ->
     )
 
     while True:
-        data = inverter.read_all()
+        try:
+            data = inverter.read_all()
+        except ConnectionException as exc:
+            LOGGER.error("Error reading from inverter: %s", exc)
+            LOGGER.error("Sleeping for 5 seconds")
+            time.sleep(5)
+            continue
+
         LOGGER.debug("Received values from inverter: %s", data)
 
         # The values, as read from the inverter, need to be scaled
