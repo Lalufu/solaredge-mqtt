@@ -79,7 +79,7 @@ def solaredge_main(mqtt_queue: multiprocessing.Queue, config: Dict[str, Any]) ->
         # Time where the next execution is supposed to happen
         now = time.time()
         nextrun = math.ceil(now / synctime) * synctime
-        sleep = nextrun - now + epsilon
+        sleep = nextrun - now - epsilon
 
         if sleep < 0:
             # This can happen if we're very close to nextrun, and
@@ -95,7 +95,24 @@ def solaredge_main(mqtt_queue: multiprocessing.Queue, config: Dict[str, Any]) ->
         event.wait(timeout=sleep)
 
         start = time.time()
-        delta = nextrun - start
+        delta = start - nextrun
+
+        # These are the various times involved here:
+        #
+        #    T_1            T_2  T_3   T_4
+        #     |              |    |     |
+        #     V              V    V     V
+        # -----------------------------------------------------
+        #
+        # T_1 is the time where we went to sleep
+        # T_2 is the time were the sleep should have ended. T_2 - T_1 is
+        #   the duration we pass to the event.wait() call.
+        # T_3 is the time where we wanted to come out of sleep. T_3 - T_2
+        #   is `epsilon`, and in an ideal world it would be 0.
+        # T_4 is the time where we actually came out of the sleep, this
+        #   is the time in `start`. T_4 - T_3 is `delta`
+        #
+        # We want to adjust `epsilon` so that T_3 == T_4.
 
         # Calculate the adjustment to the sleep duration. This takes the
         # existing offset, and corrects it by a fraction of the measured
