@@ -25,6 +25,7 @@ DEFAULTS: Dict[str, Any] = {
     "mqtt_topic": "solaredge-mqtt/tele/%(serial)s/SENSOR",
     "mqtt_client_id": "se-mqtt-gateway",
     "solaredge_port": 1502,
+    "read_every": 5,
 }
 
 
@@ -113,6 +114,14 @@ def solaredge_mqtt() -> None:
         help="Solaredge port to connect to. "
         + ("(Default: %(solaredge_port)s)" % DEFAULTS),
     )
+    parser.add_argument(
+        "--read-every",
+        type=float,
+        help="Read information from the inverter "
+        "every N seconds. The time stamp sent to MQTT will also be aligned "
+        "to a multiple of this number.",
+        default=None,
+    )
     parser.add_argument("--mqtt-host", type=str, help="MQTT server to connect to")
     parser.add_argument(
         "--mqtt-port", type=int, default=None, help="MQTT port to connect to"
@@ -154,6 +163,12 @@ def solaredge_mqtt() -> None:
     elif "solaredge_port" not in config:
         # Not set through config file, not set through CLI, use default
         config["solaredge_port"] = DEFAULTS["solaredge_port"]
+
+    if args.read_every:
+        config["read_every"] = args.read_every
+    elif "read_every" not in config:
+        # Not set through config file, not set through CLI, use default
+        config["read_every"] = DEFAULTS["read_every"]
 
     if args.mqtt_topic:
         config["mqtt_topic"] = args.mqtt_topic

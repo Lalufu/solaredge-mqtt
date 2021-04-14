@@ -5,9 +5,11 @@ This contains the solaredge/modbus specific parts
 """
 
 import logging
+import math
 import multiprocessing
+import threading
 import time
-from typing import Any, Dict
+from typing import Any, Dict, Tuple
 
 import solaredge_modbus  # type: ignore
 from pymodbus.exceptions import ConnectionException  # type: ignore
@@ -16,7 +18,7 @@ LOGGER = logging.getLogger(__name__)
 
 # A dictionary matching scale factors to the values they
 # apply to
-SCALEFACTORS = {
+SCALEFACTORS: Dict[str, Tuple] = {
     "current_scale": ("current", "p1_current", "p2_current", "p3_current"),
     "voltage_scale": (
         "p1_voltage",
@@ -44,6 +46,13 @@ def solaredge_main(mqtt_queue: multiprocessing.Queue, config: Dict[str, Any]) ->
     Main function for the solaredge process
 
     Read messages from modbus, process them and send them to the queue
+
+    This tries to sync reads from the inverter to the
+    "read_every" config setting.
+
+    The sync happens before the read from the inverter. This
+    is not ideal, since we don't know how long the read will
+    take. This is a concious tradeoff.
     """
 
     LOGGER.info("solaredge process starting")
@@ -52,13 +61,85 @@ def solaredge_main(mqtt_queue: multiprocessing.Queue, config: Dict[str, Any]) ->
         host=config["solaredge_host"], port=config["solaredge_port"], timeout=5
     )
 
+    # This is a correction term that is used to adjust for the fact
+    # that waking up from sleep takes a while.
+    epsilon = 0
+
+    # We want to run execution on seconds that are divisible by this
+    synctime = config["read_every"]
+
+    # If the scheduled start time and the actual start time is
+    # off by more than this, skip the run
+    maxdelta = 0.05
+
+    # This object is purely used to sleep on
+    event = threading.Event()
+
     while True:
+        # Time where the next execution is supposed to happen
+        now = time.time()
+        nextrun = math.ceil(now / synctime) * synctime
+        sleep = nextrun - now + epsilon
+
+        if sleep < 0:
+            # This can happen if we're very close to nextrun, and
+            # epsilon is negative. In this case restart the loop,
+            # which should push us into the next interval
+            LOGGER.error(
+                "Skipping loop due to negative sleep interval. If "
+                "this keeps happening, increase --read-every"
+            )
+            continue
+
+        # This is a lot more accurate than time.sleep()
+        event.wait(timeout=sleep)
+
+        start = time.time()
+        delta = nextrun - start
+
+        # Calculate the adjustment to the sleep duration. This takes the
+        # existing offset, and corrects it by a fraction of the measured
+        # difference.
+        #
+        # This uses a running average over the last N values,
+        # without actually having to store them.
+        #
+        # Assume epsilon contains the average of the last N
+        # values, and we want to adjust for the current delta.
+        # The amount of time we should have slept is (epsilon + delta).
+        #
+        # The new average is
+        # ( (N - 1) * epsilon ) + epsilon + delta ) / N
+        #
+        # which is the same as
+        #
+        # ( N * epsilon + delta ) / N
+        #
+        # or
+        #
+        # epsilon + ( delta / N )
+        #
+        # Take the average over the last 10
+        epsilon = epsilon + (0.1 * delta)
+
+        LOGGER.debug(
+            "Starting loop at %f, desired was %f, delta %f, new epsilon %f",
+            start,
+            nextrun,
+            delta,
+            epsilon,
+        )
+
+        if abs(delta) > maxdelta:
+            LOGGER.error("Skipping run, offset too large")
+            continue
+
         try:
             data = inverter.read_all()
         except ConnectionException as exc:
             LOGGER.error("Error reading from inverter: %s", exc)
             LOGGER.error("Sleeping for 5 seconds")
-            time.sleep(5)
+            event.wait(timeout=5)
             continue
 
         LOGGER.debug("Received values from inverter: %s", data)
@@ -75,12 +156,10 @@ def solaredge_main(mqtt_queue: multiprocessing.Queue, config: Dict[str, Any]) ->
 
         # Add a time stamp. This is an integer, in milliseconds
         # since epoch
-        data["solaredge_mqtt_timestamp"] = int(time.time() * 1000)
+        data["solaredge_mqtt_timestamp"] = int(nextrun * 1000)
 
         try:
             mqtt_queue.put(data, block=False)
         except Exception:
             # Ignore this
             pass
-
-        time.sleep(5)
