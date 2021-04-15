@@ -26,6 +26,7 @@ DEFAULTS: Dict[str, Any] = {
     "mqtt_client_id": "se-mqtt-gateway",
     "solaredge_port": 1502,
     "read_every": 5,
+    "time_offset": 0,
 }
 
 
@@ -56,6 +57,12 @@ def load_config_file(filename: str) -> Dict[str, Any]:
             ini.get("general", "solaredge-port"),
         )
         raise SystemExit(1)
+
+    if ini.has_option("general", "read-every"):
+        config["read_every"] = ini.get("general", "read-every")
+
+    if ini.has_option("general", "time-offset"):
+        config["time_offset"] = ini.get("general", "time-offset")
 
     if ini.has_option("general", "mqtt-host"):
         config["mqtt_host"] = ini.get("general", "mqtt-host")
@@ -119,7 +126,20 @@ def solaredge_mqtt() -> None:
         type=float,
         help="Read information from the inverter "
         "every N seconds. The time stamp sent to MQTT will also be aligned "
-        "to a multiple of this number.",
+        "to a multiple of this number (see also --time-offset)",
+        default=None,
+    )
+    parser.add_argument(
+        "--time-offset",
+        type=float,
+        help="The values read from the inverter are not current, "
+        "but represent a state a few seconds in the past. Use this "
+        "to offset the timestamps of the data sent to MQTT. "
+        "This mainly important to sync the read with data from a "
+        "different device, like a smart energy meter, which may use "
+        "internal time stamps. Using this will affect the alignment of "
+        "time stamps sent to MQTT (see --read-every). Positive values "
+        "will shift the time stamps into the past",
         default=None,
     )
     parser.add_argument("--mqtt-host", type=str, help="MQTT server to connect to")
@@ -169,6 +189,12 @@ def solaredge_mqtt() -> None:
     elif "read_every" not in config:
         # Not set through config file, not set through CLI, use default
         config["read_every"] = DEFAULTS["read_every"]
+
+    if args.time_offset:
+        config["time_offset"] = args.time_offset
+    elif "time_offset" not in config:
+        # Not set through config file, not set through CLI, use default
+        config["time_offset"] = DEFAULTS["time_offset"]
 
     if args.mqtt_topic:
         config["mqtt_topic"] = args.mqtt_topic

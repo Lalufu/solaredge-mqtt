@@ -173,7 +173,7 @@ def solaredge_main(mqtt_queue: multiprocessing.Queue, config: Dict[str, Any]) ->
 
         # Add a time stamp. This is an integer, in milliseconds
         # since epoch
-        data["solaredge_mqtt_timestamp"] = int(nextrun * 1000)
+        data["solaredge_mqtt_timestamp"] = int((nextrun - config["time_offset"]) * 1000)
 
         try:
             mqtt_queue.put(data, block=False)
