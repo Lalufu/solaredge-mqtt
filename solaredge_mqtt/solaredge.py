@@ -153,7 +153,9 @@ def solaredge_main(mqtt_queue: multiprocessing.Queue, config: Dict[str, Any]) ->
 
         try:
             data = inverter.read_all()
-        except ConnectionException as exc:
+            if data == {}:
+                raise ValueError("No data from inverter")
+        except (ValueError, ConnectionException) as exc:
             LOGGER.error("Error reading from inverter: %s", exc)
             LOGGER.error("Sleeping for 5 seconds")
             event.wait(timeout=5)
@@ -165,7 +167,8 @@ def solaredge_main(mqtt_queue: multiprocessing.Queue, config: Dict[str, Any]) ->
         # according to a scale factor that's also present in the data.
         for scalefactor, fields in SCALEFACTORS.items():
             for field in fields:
-                data[field] = data[field] * (10 ** data[scalefactor])
+                if field in data:
+                    data[field] = data[field] * (10 ** data[scalefactor])
 
             del data[scalefactor]
 
