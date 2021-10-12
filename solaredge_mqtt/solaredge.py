@@ -159,7 +159,7 @@ def solaredge_main(mqtt_queue: multiprocessing.Queue, config: Dict[str, Any]) ->
 
             LOGGER.debug("Received values from inverter: %s", data)
 
-            if "c_serialnumner" not in data:
+            if "c_serialnumber" not in data:
                 raise KeyError("No serial number in data")
 
             # The values, as read from the inverter, need to be scaled
