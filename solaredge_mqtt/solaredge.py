@@ -151,28 +151,35 @@ def solaredge_main(mqtt_queue: multiprocessing.Queue, config: Dict[str, Any]) ->
             LOGGER.error("Skipping run, offset too large")
             continue
 
+        data = None
         try:
             data = inverter.read_all()
             if data == {}:
                 raise ValueError("No data from inverter")
-        except (ValueError, ConnectionException) as exc:
-            LOGGER.error("Error reading from inverter: %s", exc)
+
+            LOGGER.debug("Received values from inverter: %s", data)
+
+            if "c_serialnumner" not in data:
+                raise KeyError("No serial number in data")
+
+            # The values, as read from the inverter, need to be scaled
+            # according to a scale factor that's also present in the data.
+            #
+            # This might also fail because the data received is incomplete
+            for scalefactor, fields in SCALEFACTORS.items():
+                for field in fields:
+                    if field in data:
+                        data[field] = data[field] * (10 ** data[scalefactor])
+
+                del data[scalefactor]
+
+            LOGGER.debug("Processed data: %s", data)
+
+        except (KeyError, ValueError, ConnectionException) as exc:
+            LOGGER.error("Error reading from inverter: %s, data: %s", exc, data)
             LOGGER.error("Sleeping for 5 seconds")
             event.wait(timeout=5)
             continue
-
-        LOGGER.debug("Received values from inverter: %s", data)
-
-        # The values, as read from the inverter, need to be scaled
-        # according to a scale factor that's also present in the data.
-        for scalefactor, fields in SCALEFACTORS.items():
-            for field in fields:
-                if field in data:
-                    data[field] = data[field] * (10 ** data[scalefactor])
-
-            del data[scalefactor]
-
-        LOGGER.debug("Processed data: %s", data)
 
         # Add a time stamp. This is an integer, in milliseconds
         # since epoch
