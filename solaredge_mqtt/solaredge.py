@@ -139,6 +139,17 @@ def solaredge_main(mqtt_queue: multiprocessing.Queue, config: Dict[str, Any]) ->
         # Take the average over the last 10
         epsilon = epsilon + (0.1 * delta)
 
+        if abs(epsilon) > 1:
+            LOGGER.error("Implausible epsilon (>1), resetting to 0")
+            LOGGER.error(
+                "Error occured with start=%f, nextrun=%f, delta %f, epsilon %f",
+                start,
+                nextrun,
+                delta,
+                epsilon,
+            )
+            epsilon = 0
+
         LOGGER.debug(
             "Starting loop at %f, desired was %f, delta %f, new epsilon %f",
             start,
