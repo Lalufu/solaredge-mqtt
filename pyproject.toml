@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "solaredge-mqtt"
-version = "0.1.0"
+version = "0.1.1"
 description = "A gateway from SolarEdge inverters using modbus TCP to MQTT"
 authors = ["Ralf Ertzinger <ralf@skytale.net>"]
 license = "GPL-3.0-only"
@@ -10,6 +10,7 @@ python = "^3.6"
 paho-mqtt = "^1.5.1"
 typing_extensions = "^3.7.4"
 solaredge-modbus = "^0.6.4"
+pymodbus = "<3.0.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^6.2.1"
