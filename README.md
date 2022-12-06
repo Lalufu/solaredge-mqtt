@@ -10,18 +10,18 @@ talking to MQTT.
 
 ## Installation
 
+Install via `pip`: `pip install git+https://github.com/Lalufu/solaredge-mqtt`.
+This will create a binary named `solaredge-mqtt` in the venv.
+
+## Development
+
 This project uses [Poetry](https://python-poetry.org/) for dependency
-management, and it's probably easiest to use this, Executing `poetry install 
---no-dev` followed by `poetry run solaredge-mqtt` from the git checkout root should
+management, and it's probably easiest to use this. Executing `poetry install`
+followed by `poetry run solaredge-mqtt` from the git checkout root should
 set up a venv, install the required dependencies into a venv and run
 the main program.
 
-Installation via pip into a venv is also possible with `pip install .` from
-the git checkout root. This will also create the executable scripts in the
-`bin` dir of the checkout.
-
-In case you want to do things manually, the main entry point into
-the program is `solaredge_mqtt/cli.py:solaredge_mqtt()`.
+The main entry point into the program is `solaredge_mqtt/cli.py:solaredge_mqtt()`.
 
 ## Running
 
@@ -42,15 +42,15 @@ the program is `solaredge_mqtt/cli.py:solaredge_mqtt()`.
   Config file: Section `general`, `solaredge-port`
 
 `--read-every N`
-: Read information from the inverter "every N seconds. The time stamp sent to
+: Read information from the inverter every N seconds. The time stamp sent to
 MQTT will also be aligned to a multiple of this number (see also --time-offset)
 
   Config file: Section `general`, `read-every`. Defaults to 5.
 
 `--time-offset N`
-: The values read from the inverter are not current, "but represent a state
+: The values read from the inverter are not current, but represent a state
 a few seconds in the past. Use this to offset the timestamps of the data sent
-to MQTT. "This mainly important to sync the read with data from a different
+to MQTT. This is mainly important to sync the read with data from a different
 device, like a smart energy meter, which may use internal time stamps. Using
 this will affect the alignment of time stamps sent to MQTT (see --read-every).
 Positive values will shift the time stamps into the past.
